@@ -37,7 +37,7 @@
          "splitter",
          "tbfed-pagefooter",
          "sectionx",
-         "simple-page-toc",
+         "-simple-page-toc", "-page-toc",
          "page-toc-button",
          "pageview-count",
          "auto-scroll-table",
@@ -65,10 +65,6 @@
             "copyright":"Copyright &copy BlueSpace 2023",
             "modify_label": "Last Modification Time: ",
             "modify_format": "YYYY-MM-DD HH:mm:ss"
-        },
-        "simple-page-toc": {
-            "maxDepth": 10,
-            "skipFirstH1": false
         },
         "page-toc-button": {
             "maxTocDepth": 10,
