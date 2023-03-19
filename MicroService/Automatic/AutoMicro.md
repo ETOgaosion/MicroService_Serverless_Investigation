@@ -107,7 +107,7 @@ architecture:
 
 ### 项目树-模块映射
 
-需要将`architecture`中出现的组件名与项目树中的文件夹对应映射，即`Components`$\leftrightarrow$`Module`。
+需要将`architecture`中出现的组件名与项目树中的文件夹对应映射，即`Components`$$\leftrightarrow$$`Module`。
 
 按照开发建议中[C++单体应用的项目结构](#单体应用项目架构)，本项目也使用这种模板来对源程序改造，因此在`src`目录下，需要能够找到在架构图中所使用的各个组件（模块），因此需要一种映射关系，我们直接借用`tree`命令并使用`.gitignore`过滤干扰文件夹：
 
