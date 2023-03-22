@@ -196,22 +196,50 @@ third*party
 
 在前文[微服务项目组织架构图描述语言](#微服务项目组织架构图描述语言)部分介绍了微服务拆分的组织架构图，要想实现这种微服务的联系，节点或服务之间需要有调用关系，本项目需要知道服务之间调用对应于单体应用的调用函数，使用`call`关键字定义这种关系。
 
-- 因为目前使用`grpc`作为服务间通信协议，因此还需要指明服务调用的参数`argumemt`（现阶段不可重复，后期支持重复）与返回值`return`类型，可以是C++的基本数据结构也可以是远端存储的类
+- 因为目前使用gRPC作为服务间通信协议，因此还需要指明服务调用的参数`argumemt`（现阶段不可重复，后期支持重复）与返回值`return`类型，可以是C++的基本数据结构也可以是远端存储的类
 - 可以为稍复杂的数据传输定义类，但不推荐这么做，节点间大型的数据传输都需要通过Redis网络
+
+对于gRPC，后续还应支持不止是同步的远程调用，还要支持异步与回调，三者分别对应关键词`sync`, `async`, `callback`，其中`callback`后面需要加回调所需要调用的函数名，将在远程调用返回后启动线程执行，因此需要带完整命名空间的表述。
 
 ###### 分布式并行
 
-对于一些类似`for`循环的可并行步骤，若在本地能够通过`openmp`框架运行，且不存在较多的同步需求，则可以进行分布式并行执行，利用更多机器的资源更快的完成任务。
+对于一些类似`for`循环的可并行步骤，若在本地能够通过`openmp`框架运行，且不存在较多的同步需求，则可以进行分布式并行执行，不同节点之间，节点内部线程之间都能够并行，利用更多机器的资源更快的完成任务。
 
 本项目所采用的分布式并行设计源于MapReduce，或者分布式的clone/fork，分发与收集的数据量很少，由各个节点自行准备数据。
 
-- 关键字`parallel`描述了这一行为，本项目将自动提取函数逻辑，分发至不同节点运算。
+- 关键字`parallel`描述了这一行为，本项目将自动提取函数逻辑，分发至不同节点运算；后面需要加`data`及所需要的顶层数据结构名，将按照索引树生成和调用`data`之下的数据结构远端传输
+- 关键字`critical`作用在函数线程共享域的`get`, `set`函数上，使函数内的数据库操作使用事务处理保证正确性，根据体系结构中描述的指令冲突类别，此处也需要指出冲突类别：`ww`, `rw`，会对不同的冲突采用不同的方式避免
+	- 目前存在临界区的相关数据结构都不经过各节点的远端数据库Cache
+	- 在引入远端数据库Cache后会利用额外存储信息标识脏数据，以在各个节点之间同步，会引入更加频繁的网络与rpc开销
+
+`parallel`关键字作用在`for`循环，最简单/理想情况下可并行`for`循环有以下形式：
+
+```C++
+for (int i = begin; i < end; i++) {
+	value[i] = muchCostFunction(i/*, other read only parameters */)
+}
+total_res = simpleSynchronize(value);
+```
+
+在使用openmp运行时做到最佳的线程隔离性，能够最方便地改成分布式并行程序
+
+但若在`muchCostFunction`内部存在对共享数据结构的修改，现阶段的一致性实现方式是在涉及到的类相关域的`set`函数上做数据库同步操作，保持函数接口不变，因此需要在涉及到的`set`函数上使用`critical`标记。
+
+对于读写冲突需要在写未完成是阻塞读线程，在未来会予以实现。
+
+`get`和`set`函数采用广义，如`append`等函数也采用相同思路。
+
+本项目针对这种语义的核心任务为一个原子操作：首先从数据库中拉取`pull`对应的数据结构，将其重新生成并序列化后原子存储数据库`push`，完成这一操作期间对数据库这一表项不能有其他任何操作（读写都不可）。
+
+后期对于数据库内存Cache写回操作的支持还需要使用gRPC通知其余节点将对应表项设置invalid或dirty。
 
 #### ms编译制导语法规范
 
-##### share
+##### data
 
-###### root
+###### share
+
+- root
 
 ```cpp
 #pragma ms share root
@@ -220,7 +248,7 @@ class Root {}
 
 此类将作为模块中森林的根向下组织数据结构
 
-###### leaf (temporary)
+- leaf (temporary)
 
 ```cpp
 #pragma ms share leaf [fusion]
@@ -229,7 +257,7 @@ class Leaf {}
 
 将作为根节点的下属，且数据结构稍复杂，需要独立存储
 
-###### fusion
+- fusion
 
 ```cpp
 #pragma ms share fusion
@@ -240,7 +268,7 @@ class FusionLeaf {}
 
 ##### field
 
-###### optional
+- optional
 
 ```cpp
 class A() {
@@ -252,7 +280,7 @@ private:
 
 在A的生成过程中可能不会生成m域
 
-###### ignore
+- ignore
 
 ```cpp
 class A() {
@@ -263,3 +291,57 @@ private:
 ```
 
 无需使用类A的域m
+
+##### function
+
+###### call
+
+```cpp
+class A() {
+public:
+	// current
+	#pragma ms call argument int return int
+	// future
+	#pragma ms call argument (int) return int [(a?sync)|(callback funcName)]
+	int caller(int a) {};
+}
+```
+
+将`caller`函数移到远端执行，本地调用接口不变，但执行过程已由远端进行。
+
+###### parallel
+
+```C++
+class A() {
+private:
+	std::vector<int> a;
+public:
+	#pragma ms critical ww
+	void append_a(int in_a) { a.push_back(in_a); }
+}
+
+class B {
+private:
+	A a_instance;
+	int muchCostFunction(int i) {
+		int value;
+		/* ... */
+		a_instance.append_a(value);
+	}
+public:
+	int calculate() {
+		std::vector<int> values(10, 0);
+		#pragma ms parallel
+		for (int i = 0; i < 10; i++) {
+			values[i] = muchCostFunction(i);
+		}
+		int res = 0;
+		for (auto it : values) {
+			res += it;
+		}
+		return res;
+	}
+}
+```
+
+将`muchCostFunction`移动到远端分布式执行循环的一部分，而后汇总结果，对公共数据`a_instance`的写入将在数据库层面完成同步。
