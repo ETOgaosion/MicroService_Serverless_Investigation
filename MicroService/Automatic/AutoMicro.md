@@ -214,7 +214,7 @@ third*party
 
 `parallel`关键字作用在`for`循环，最简单/理想情况下可并行`for`循环有以下形式：
 
-```C++
+```cpp
 for (int i = begin; i < end; i++) {
 	value[i] = muchCostFunction(i/*, other read only parameters */)
 }
@@ -311,7 +311,7 @@ public:
 
 ###### parallel
 
-```C++
+```cpp
 class A() {
 private:
 	std::vector<int> a;
