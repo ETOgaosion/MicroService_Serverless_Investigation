@@ -23,9 +23,9 @@
 - `doc`: 项目文档库
 - `examples`: 项目使用范例
 - `src`: 项目主要代码，在单体应用分层构建时可能有各种层次结构，模块由`module`组成，`module`可由无限级的`submodule`组成，我们关心三种最关键的模块代码：
-	- `data`: 关于数据的存储、管理与使用
-	- `business`: 处理业务逻辑的模块
-	- `calculation`: 计算密集的应用模块
+    - `data`: 关于数据的存储、管理与使用
+    - `business`: 处理业务逻辑的模块
+    - `calculation`: 计算密集的应用模块
 - `test`: 项目测试程序
 - `thirdparty`: 项目使用的第三方库
 
@@ -35,13 +35,13 @@
 为简便实现，本项目主要采用Python，遵照Python项目的结构。
 
 - `config`: 项目面向配置，包含微服务拆分的指导配置
-	- `.clang-format`: 采用Google Code Style，将用户原C++工程格式重构，利用这种方式省去利用clang编译器重构项目的必要性
-	- `architecture`: 本项目将设计新的语言或者使用json等描述文件刻画用户的微服务组织架构图，项目运行将以此作为重要参考
-	- `tree_module_map`: 表明文件树中文件夹所代表的模块名，模块都应在微服务`architecture`中得到体现
-	- `tutorial.md`: 该教程为组织架构图的描述语言介绍
+    - `.clang-format`: 采用Google Code Style，将用户原C++工程格式重构，利用这种方式省去利用clang编译器重构项目的必要性
+    - `architecture`: 本项目将设计新的语言或者使用json等描述文件刻画用户的微服务组织架构图，项目运行将以此作为重要参考
+    - `tree_module_map`: 表明文件树中文件夹所代表的模块名，模块都应在微服务`architecture`中得到体现
+    - `tutorial.md`: 该教程为组织架构图的描述语言介绍
 - `micro_service_app`: 生成的微服务程序
 - `raw_app`: 用户源代码，需要用户在源码中添加编译制导指令`#pragma ms`来指导本项目生成分布式共享数据库
-	- `tutorial.md`: 微服务编译制导指令的格式与介绍
+    - `tutorial.md`: 微服务编译制导指令的格式与介绍
 - `source_libs`: 包含已写好可直接搬运使用的微服务源码
 - `src`: 项目源代码主目录
 - `requirements.txt`: 依赖包安装
@@ -53,16 +53,16 @@
 
 - `API Server`: 作为用户使用微服务的接口，负责与单用户流程的主节点通信
 - `Node`: 以docker为单位的节点，为调度和微服务基本单位
-	- `Components`: `Node`由组件`Components`构成，组件有三种角色(`role`)：
-		- `inNode`为不与外界交互的逻辑模块，只对内提供服务
-		- `Server`为向外界提供服务的模块
-		- `Client`为请求外界服务的模块
-	- `Functions`: `Node`有特定功能，后两者可与前三者组合
-		- `File`为文件处理节点
-		- `Calculate`为计算节点
-		- `Passer`为中间数据处理、传递节点
-		- `Master`可以是全局主节点，也能够是特定任务的局部主节点，全局主节点仅能有一个
-		- `Child`为承担并行任务的子节点
+    - `Components`: `Node`由组件`Components`构成，组件有三种角色(`role`)：
+        - `inNode`为不与外界交互的逻辑模块，只对内提供服务
+        - `Server`为向外界提供服务的模块
+        - `Client`为请求外界服务的模块
+    - `Functions`: `Node`有特定功能，后两者可与前三者组合
+        - `File`为文件处理节点
+        - `Calculate`为计算节点
+        - `Passer`为中间数据处理、传递节点
+        - `Master`可以是全局主节点，也能够是特定任务的局部主节点，全局主节点仅能有一个，使用`GlobalMaster`与`LocalMaster`区分之
+        - `Child`为承担并行任务的子节点
 - `Layer`: 当若干`Node`运行不存在冲突时，可并行运行，则可在同一`Layer`
 - `RequestEdge`: 当存在一个`Node`的`Client Component`对另一个`Node`的`Server Component`有动作请求，则使用`RequestEdge`表明这种关系。不需要`ResponseEdge`，因为请求必被允许，可以理解为若两`Node`之间存在有向边`Edge`，则方向代表请求。`RequestEdge`落到`Components`
 
@@ -78,29 +78,29 @@ architecture:
   - layer:
     name: "layer_layer_name" # must be unique
     # nodes
-	nodes:
-	  - node:
-	    name: "node_node_name"
-	    # functions
-	    functions: 
-	      - ["File", "Calculate", "Passer"] # Not a list, only chose one
-	      - ["Master", "Child"] # Not a list, only chose one
-	    # components
-	    components:
-	      - component:
-	        name: "module_module_name" # match with module in raw project belew
-	        role: ["inNode", "Server", "Client"] # Not a list, only chose one
-	        request_edges: # only Servers have this field
-	          - target:
-	            layer_name: "other_layer_name"
-	            node_name: "other_node_name"
-	            component: "other_component_name"
-	          - target:
-	          # same below
-	      - component:
-	      # same below
-	  - node:
-	  # same below
+    nodes:
+      - node:
+        name: "node_node_name"
+        # functions
+        functions: 
+          - ["File", "Calculate", "Passer"] # Not a list, only chose one
+          - ["GlobalMaster", "LocalMaster", "Child"] # Not a list, only chose one
+        # components
+        components:
+          - component:
+            name: "module_module_name" # match with module in raw project belew
+            role: ["inNode", "Server", "Client"] # Not a list, only chose one
+            request_edges: # only Clients have this field
+              - target:
+                layer_name: "other_layer_name"
+                node_name: "other_node_name"
+                component: "other_component_name"
+              - target:
+              # same below
+          - component:
+          # same below
+      - node:
+      # same below
   - layer:
   # same below
 ```
@@ -136,10 +136,12 @@ third*party
 - `topdir`: 仅作为单体应用封装的顶层文件夹，不会在架构图中出现
 - `subdir`: 仅为子文件夹，将与上层`module`合并
 - `third-party`: 未排除的第三方库
-	- 若需要在common中加入，则在后面加`common`
-	- 若只需要链接某些模块或目录，则在后面加`link`，而后将模块或目录的顶层文件夹路径
+    - 若需要在common中加入，则在后面加`common`
+    - 若只需要链接某些模块或目录，则在后面加`link`，而后将模块或目录的顶层文件夹路径
 - `module`: 为架构图中模块
 - `submodule`: 对应架构图中模块，作为独立功能的子结构存在于`module`中
+
+此外，部分应用的分布式并行程序位于模块内部的某个文件内，只需在文件夹目录下方添加`submodule`即可
 
 举例如下（STA应用）：
 
@@ -161,6 +163,8 @@ third*party
 ├── ./sdf-parser ignore
 ├── ./shell-cmd ignore
 ├── ./sta module
+│   └── ./sta/StaDelayPropagation.cc submodule
+│   └── ./sta/StaSlewPropagation.cc submodule
 ├── ./user-shell ignore
 ├── ./utility third-party link ./delay
 └── ./verilog-parser verilog module
@@ -183,10 +187,11 @@ third*party
 在理想状态下，每个模块的数据结构组织都是森林（或树），允许有回边。
 
 - 首先在每个模块中需要将森林中树的顶点类明确标注，定义为`root`，在本项目的代码运行中也会形成森林结构，只需指明需要节点间共享的树定点程序即可了解某一棵树需要远端共享存储
-	- 工作量略多，现阶段可以尝试标注所有树枝和树叶，但未来考虑用户易用性需要程序自动构建森林；现阶段标注树叶使用`leaf`关键字
+    - 工作量略多，现阶段可以尝试标注所有树枝和树叶，但未来考虑用户易用性需要程序自动构建森林；现阶段标注树叶使用`leaf`关键字
 - 为了性能考虑，对于C++类中的一些optional fields，即不一定在对象生成周期会存在的域，可以在代码中使用`std::optional`指明，或者使用编译制导`optional`进行定义
 - 若类中存在无需使用的域，则使用关键字`ignore`来标注
 - 对于某些细粒度的类，若没有必要单独存储，则可以通过编译制导`fusion`，此举将类的数据合并至上层。以这种方式来控制数据结构存储的粒度
+- 对于面向对象的类设计，着重考虑使用最广泛的继承方法，若用户选择面向父类的设计实现，则无需加入编译制导语句，属于默认情况；但若更需要使用子类，则需要在对应的继承说明前加入`usechild`关键字
 
 ##### 运行逻辑
 
@@ -209,14 +214,14 @@ third*party
 
 - 关键字`parallel`描述了这一行为，本项目将自动提取函数逻辑，分发至不同节点运算；后面需要加`data`及所需要的顶层数据结构名，将按照索引树生成和调用`data`之下的数据结构远端传输
 - 关键字`critical`作用在函数线程共享域的`get`, `set`函数上，使函数内的数据库操作使用事务处理保证正确性，根据体系结构中描述的指令冲突类别，此处也需要指出冲突类别：`ww`, `rw`，会对不同的冲突采用不同的方式避免
-	- 目前存在临界区的相关数据结构都不经过各节点的远端数据库Cache
-	- 在引入远端数据库Cache后会利用额外存储信息标识脏数据，以在各个节点之间同步，会引入更加频繁的网络与rpc开销
+    - 目前存在临界区的相关数据结构都不经过各节点的远端数据库Cache
+    - 在引入远端数据库Cache后会利用额外存储信息标识脏数据，以在各个节点之间同步，会引入更加频繁的网络与rpc开销
 
 `parallel`关键字作用在`for`循环，最简单/理想情况下可并行`for`循环有以下形式：
 
 ```cpp
 for (int i = begin; i < end; i++) {
-	value[i] = muchCostFunction(i/*, other read only parameters */)
+    value[i] = muchCostFunction(i/*, other read only parameters */)
 }
 total_res = simpleSynchronize(value);
 ```
@@ -225,7 +230,7 @@ total_res = simpleSynchronize(value);
 
 但若在`muchCostFunction`内部存在对共享数据结构的修改，现阶段的一致性实现方式是在涉及到的类相关域的`set`函数上做数据库同步操作，保持函数接口不变，因此需要在涉及到的`set`函数上使用`critical`标记。
 
-对于读写冲突需要在写未完成是阻塞读线程，在未来会予以实现。
+对于读写冲突需要在写未完成时阻塞读线程，在未来会予以实现。
 
 `get`和`set`函数采用广义，如`append`等函数也采用相同思路。
 
@@ -273,8 +278,8 @@ class FusionLeaf {}
 ```cpp
 class A() {
 private:
-	#pragma ms field optional
-	int m;
+    #pragma ms field optional
+    int m;
 }
 ```
 
@@ -285,8 +290,8 @@ private:
 ```cpp
 class A() {
 private:
-	#pragma ms field ignore
-	int m;
+    #pragma ms field ignore
+    int m;
 }
 ```
 
@@ -299,11 +304,11 @@ private:
 ```cpp
 class A() {
 public:
-	// current
-	#pragma ms call argument int return int
-	// future
-	#pragma ms call argument (int) return int [(a?sync)|(callback funcName)]
-	int caller(int a) {};
+    // current
+    #pragma ms call argument int return int
+    // future
+    #pragma ms call argument (int) return int [(a?sync)|(callback funcName)]
+    int caller(int a) {};
 }
 ```
 
@@ -314,33 +319,33 @@ public:
 ```cpp
 class A() {
 private:
-	std::vector<int> a;
+    std::vector<int> a;
 public:
-	#pragma ms critical ww
-	void append_a(int in_a) { a.push_back(in_a); }
+    #pragma ms critical ww
+    void append_a(int in_a) { a.push_back(in_a); }
 }
 
 class B {
 private:
-	A a_instance;
-	int muchCostFunction(int i) {
-		int value;
-		/* ... */
-		a_instance.append_a(value);
-	}
+    A a_instance;
+    int muchCostFunction(int i) {
+        int value;
+        /* ... */
+        a_instance.append_a(value);
+    }
 public:
-	int calculate() {
-		std::vector<int> values(10, 0);
-		#pragma ms parallel
-		for (int i = 0; i < 10; i++) {
-			values[i] = muchCostFunction(i);
-		}
-		int res = 0;
-		for (auto it : values) {
-			res += it;
-		}
-		return res;
-	}
+    int calculate() {
+        std::vector<int> values(10, 0);
+        #pragma ms parallel
+        for (int i = 0; i < 10; i++) {
+            values[i] = muchCostFunction(i);
+        }
+        int res = 0;
+        for (auto it : values) {
+            res += it;
+        }
+        return res;
+    }
 }
 ```
 
