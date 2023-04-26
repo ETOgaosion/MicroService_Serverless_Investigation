@@ -112,7 +112,7 @@ architecture:
 按照开发建议中[C++单体应用的项目结构](#单体应用项目架构)，本项目也使用这种模板来对源程序改造，因此在`src`目录下，需要能够找到在架构图中所使用的各个组件（模块），因此需要一种映射关系，我们直接借用`tree`命令并使用`.gitignore`过滤干扰文件夹：
 
 ```sh
-cd src/.../modules_top_dir && tree -d -f --gitignore -o /path/to/config/project_module_tree.cfg
+tree -d -f --gitignore -o config/module_tree.cfg src/modules_top_dir
 ```
 
 `.gitignore`内容如下：
@@ -130,7 +130,7 @@ third*party
 
 排除的文件中例如`thirdparty`第三方库会被集合进`Common`库，为每个微服务自动链接。
 
-在运行完成此前命令后，打开`config`下`project_module_tree.cfg`文件，在模块名与文件夹名不同的项后添加模块名，并且需要将模块特征附后（所有条目），使用空格分隔，模块特征有以下几种：
+在运行完成此前命令后，打开`config`下`module_tree.cfg`文件，在模块名与文件夹名不同的项后添加模块名，并且需要将模块特征附后（所有条目），使用空格分隔，模块特征有以下几种：
 
 - `ignore`: 不属于模块，可以在此标定也可以在`.gitignore`中添加
 - `topdir`: 仅作为单体应用封装的顶层文件夹，不会在架构图中出现

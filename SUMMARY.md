@@ -21,7 +21,7 @@
 	* [框架](Serverless/Frameworks/Lambda.md)
 	* [框架](Serverless/Frameworks/OpenFass.md)
 	* [框架](Serverless/Frameworks/OpenWisk.md)
-	* [框架](Serverless/Frameworks/Ray.md)
+	* [框架](Ray.md)
 * [Articles](Articles/README.md)
 	* [ASPLOS](Articles/ASPLOS.md)
 	* [ATC](Articles/ATC.md)
