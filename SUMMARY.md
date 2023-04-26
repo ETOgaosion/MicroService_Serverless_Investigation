@@ -29,3 +29,5 @@
 	* [SOCC](Articles/SOCC.md)
 	* [SOSP](Articles/SOSP.md)
 * [Design](Design/README.md)
+    * [Insights](Design/Insights.md)
+    * [UseCase](Design/UseCase.md)
