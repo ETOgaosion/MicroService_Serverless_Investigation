@@ -28,3 +28,4 @@
 	* [EuroSys](Articles/EuroSys.md)
 	* [SOCC](Articles/SOCC.md)
 	* [SOSP](Articles/SOSP.md)
+* [Design](Design/README.md)
