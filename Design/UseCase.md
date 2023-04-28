@@ -263,9 +263,9 @@ func execute(app cf.App) {
     secondOutputInterface = append(secondOutputInterface, true, "file", "res.txt")
     flow = flow.input(data_read, 20)
                .map(word_count, 100, 20)
-               .reduce(wc_reduce, reduceInterface, false)
+               .reduce(wc_reduce, false, reduceInterface)
                .output(output, firstOutputInterface)
-               .reduce(wc_reduce, reduceInterface, true)
+               .reduce(wc_reduce, true, reduceInterface)
                .output(output, secondOutputInterface)
 }
 
