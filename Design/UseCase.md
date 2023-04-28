@@ -274,3 +274,34 @@ func execute(app cf.App) {
 
 ## CLI
 
+ascii font: slant
+
+```sh
+~ cf --cli
+# command cloudflow, alias cf
+> help
+
+   ________                __________             
+  / ____/ /___  __  ______/ / ____/ /___ _      __
+ / /   / / __ \/ / / / __  / /_  / / __ \ | /| / /
+/ /___/ / /_/ / /_/ / /_/ / __/ / / /_/ / |/ |/ / 
+\____/_/\____/\__,_/\__,_/_/   /_/\____/|__/|__/  
+                                                  
+===============================================================================
+An Inclusive Framework Supporting FLow, MicroServices and Distributed Computing
+
+Usage:
+    cloudflow [command]
+
+Available Commands:
+    build    CloudFlow will build your go project
+    config
+    create
+    deploy
+    invoke
+    logs
+    info
+    remove
+    print
+    status
+```
