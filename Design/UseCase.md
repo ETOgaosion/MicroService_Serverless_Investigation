@@ -10,38 +10,50 @@
 
 ```python
 import cloudflow as cf
-from typing import TypeAlias
-
-def pre_run():
-    cf.init("cf_cfg.yaml")                                  # When cf is not running
-                                                            # simply need to configure
 
 def run_app():
-    app = cf.app.new("cf_app_cfg.yaml")
+    app = cf.create_app("cf_app_cfg.yaml")
     # app.service include
     app.serve()                                             # async start app
 
 if __name__ == "__main__":
-    cf.pre_run(pre_run)
     cf.run_app(run_app)
 ```
 
 ##### execute session
 
+共三种方式，一是以flow为单位运行`execute()`方法，进行每一步flow的运行，这种方式利于debug；其余方式是形成完成flow之后统一运行所有步骤，更符合图计算的运行模式。[go的运行模式相同](<##### go execute session>)
+
 ```python
+# I. single process calculation
+app = cf.app.get("App Name")
+session = app.create_session("session_cfg.yaml")
+# session.source create
+# session.filter create
+# session.flow create
+# 1st way run
+flow.execute();
+# session.flow create
+flow.execute();
+
+# II. whole process calculation
 def execute(app: cf.App):
-    session = app.session.new("session_cfg.yaml")
+    session = app.create_session("session_cfg.yaml")
     # session.source create
     # session.filter create
     # session.flow create
-    session.run()                                           # async run session
 
 # session exection
 app = cf.app.get("App Name")
+# 2nd way run
 app.execute(execute)
-if app.session.get("Session Name").status == cf.Status.FINISHED:
-    print("Execute Successfully")
-    app.session.clean("Session Name")
+# 3rd way run
+app.session.get("Session Name").execute_all()
+while app.session.get("Session Name").status != cf.Status.FINISHED:
+    import time
+    time.sleep(1)
+print("Execute Successfully")
+app.clean_session("Session Name")
 
 # other utilities
 app = cf.app.get("App Name")
@@ -57,53 +69,62 @@ app.session.log("Session Name", "Path")
 
 ```go
 import "cloudflow"
-import "fmt"
 var cf cloudflow.CF
 
-func preRun() {
-    cf.init("cf_cfg.yaml")
-}
-
 func runApp()) {
-    app := cf.app.new("cf_app_cfg.yaml")
+    app := cf.CreateApp("cf_app_cfg.yaml")
     // app.service include
     app.serve()
 }
 
 func main() {
-    cf.preRun(PreRun)
-    cf.runApp(RunApp)
+    cf.RunApp(runApp)
 }
 ```
 
-##### execute session
+##### go execute session
 
 ```go
-func execute(app cloudflow.CF.App) {
-    session := app.session.New("session_cfg.yaml")
+// I. single process calculation
+func main() {
+    app := cf.app.Get("App Name")
+    session := app.CreateSession("session_cfg.yaml")
     // session.source create
     // session.filter create
     // session.flow create
-    session.Run()                                           // async run session
+    // 1st way run
+    flow.Execute();
+    // session.flow create
+    flow.Execute();
+}
+
+// II. whole process calculation
+func execute(app cloudflow.CF.App) {
+    session := app.CreateSession("session_cfg.yaml")
+    // session.source create
+    // session.filter create
+    // session.flow create
 }
 
 // session exection
 func utility() {
     app := cf.app.Get("App Name")
+    // 2nd way run
     app.Execute(execute)
-    if app.session.Get("Session Name").status == cf.Status.FINISHED:
-        fmt.Println("Execute Successfully")
-        app.session.Clean("Session Name")
+    // 3rd way run
+    app.session.Get("Session Name").Execute()
+    for app.session.Get("Session Name").Status != cf.Status.FINISHED:
+        time.Sleep(time.Second)
+    fmt.Println("Execute Successfully")
+    app.session.Clean("Session Name")
     
-    # other utilities
+    // other utilities
     app.ForceTerminate()
     app.Log("Path")
     app.session.ForceQuite("Session Name")
     app.session.Log("Session Name", "Path")
 }
 ```
-
-### Source
 
 ### Flow
 
@@ -115,19 +136,21 @@ func utility() {
 2. 之前函数的输出参数，需全部包含
 3. 用户额外指定的参数，使用`append_args`指定
 
+### Examples
+
 #### MapReduce: WordCount
 
 ##### Python
 
 ```python
-def data_read(session: cf.App.Session) -> str:
+def data_read(session: cf.App.Session) -> list[str]:
     pid = session.get_pid()
     num = session.get_num()
     src = session.get_source(pid, num)
-    data = ""
+    data = []
     for f in src[pid * num: (pid + 1) * num]:
         for l in open(f).readlines():
-            data = l
+            data.append(l)
     return data
 
 # map
@@ -148,7 +171,7 @@ def merge_dict(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
 MergeFunc = Callable[[dict[str, int], dict[str, int]], dict[str, int]]
 
 # reduce
-def wc_reduce(session: cf.App.Session, data: dict[str, int], merge: MergeFunc) -> dict[str, int]:
+def wc_reduce(session: cf.App.Session, data: list[dict[str, int]], merge: MergeFunc) -> dict[str, int]:
     wc = {}
     for d in data:
         wc = merge_dict(wc, d)
@@ -163,13 +186,21 @@ def output(session: cf.App.Session, data: dict[str, int], is_final: bool) -> dic
 
 # execution
 def execute(app: cf.App):
-    session app.session.new("session_cfg.yaml")
+    session = app.create_session("session_cfg.yaml")
     files = os.listdir("File Path")
-    session.source.init(files)
+    session.create_source(files, type="files")
     # 1st way
-    session.flow.init("cncf_workflow.yaml")
+    session.import_flow("cncf_workflow.yaml")
     # 2nd way
-    flow = session.flow.init("wc")
+    flow = session.create_flow("wc")
+    # 1st way run
+    flow.input(data_read, count=20).execute()
+    flow.map(word_count, batch_size=100, count=20).execute()
+    flow.reduce(wc_reduce, append_args=(merge_dict), is_final=False).execute()
+    flow.output(output, append_args=(False), way="stdout").execute()
+    flow.reduce(wc_reduce, append_args=(merge_dict), is_final=True).execute()
+    flow.output(output, append_args=(True), way="file", path="res.txt").execute()
+    # 2nd/3rd way run
     flow = flow.input(data_read, count=20)
                .map(word_count, batch_size=100, count=20)
                .reduce(wc_reduce, append_args=(merge_dict), is_final=False)
@@ -177,7 +208,7 @@ def execute(app: cf.App):
                .reduce(wc_reduce, append_args=(merge_dict), is_final=True)
                .output(output, append_args=(True), way="file", path="res.txt")
 
-# session execution like above
+# 2nd/3rd way of session execution like above
 ```
 
 ##### Go
@@ -231,7 +262,7 @@ func mergeDict(a map[string]int, b map[string]int) map[string]int {
 type MergeFunc func(map[string]int, map[string]int) map[string]int) map[string]int
 
 // reduce
-func wcReduce(session: cf.App.Session, data map[string]int, merge MergeFunc {
+func wcReduce(session: cf.App.Session, data []map[string]int, merge MergeFunc) map[string]int {
     wc := make(map[string]int)
     for d in data:
         wc = mergeDict(wc, d)
@@ -246,30 +277,257 @@ func output(session cf.App.Session, data map[string]int], is_final bool) map[str
     return data
 }
 
-# execution
+// execution
 func execute(app cf.App) {
-    session app.session.new("session_cfg.yaml")
+    session := app.CreateSession("session_cfg.yaml")
     files,_ := ioutil.ReadDir("File Path")
-    session.source.Init(files)
+    session.CreateSource(files)
     // 1st way
-    session.flow.Init("cncf_workflow.yaml")
+    session.ImportFlow("cncf_workflow.yaml")
     // 2nd way
-    flow := session.flow.init("wc")
+    flow := session.CreateFlow("wc")
     var reduceInterface []interface{}
     reduceInterface = append(reduceInterface, merge_dict)
     var firstOutputInterface []interface{}
     firstOutputInterface = append(firstOutputInterface, false, "stdout")
     var secondOutputInterface []interface{}
     secondOutputInterface = append(secondOutputInterface, true, "file", "res.txt")
-    flow = flow.input(data_read, 20)
-               .map(word_count, 100, 20)
-               .reduce(wc_reduce, false, reduceInterface)
-               .output(output, firstOutputInterface)
-               .reduce(wc_reduce, true, reduceInterface)
-               .output(output, secondOutputInterface)
+    // 1st way run
+    flow.Input(data_read, 20).Execute()
+    flow.Map(wordCount, 100, 20).Execute()
+    flow.Reduce(wcReduce, false, reduceInterface).Execute()
+    flow.Output(output, firstOutputInterface).Execute()
+    flow.Reduce(wcReduce, true, reduceInterface).Execute()
+    flow.Output(output, secondOutputInterface).Execute()
+    // 2nd/3rd way run
+    flow = flow.Input(data_read, 20)
+               .Map(wordCount, 100, 20)
+               .Reduce(wcReduce, false, reduceInterface)
+               .Output(output, firstOutputInterface)
+               .Reduce(wcReduce, true, reduceInterface)
+               .Output(output, secondOutputInterface)
 }
 
-# session execution like above
+// session execution like above
+```
+
+#### Pi Estimation
+
+随机统计法
+
+##### Python
+
+```python
+def calculate_one_point(session: cf.App.Sesssion) -> int:
+    x, y = random.random(), random.random()
+    return x * x + y * y < 1 ? 1 : 0
+
+def count(session: cf.App.Session, points: list[int]) -> int:
+    res = 0
+    for i in points:
+        res += i
+    return res
+
+def calculate_res(session: cf.App.Session, count_res: int, sample_num: int) -> float:
+    # 1st way
+    return count_res * 4 / session.flow_count("calculate_one_point")
+    # 2nd way
+    return count_res * 4 / sample_num
+
+def execute(app cf.App):
+    session = app.create_session("session_cfg.yaml")
+    # 1st way
+    session.import_flow("cncf_workflow.yaml")
+    # 2nd way
+    flow = session.create_flow("pi")
+    # 1st way run
+    flow.map(calculate_one_point, count=NUM_SAMPLES).execute()
+    flow.reduce(count).execute()
+    flow.output(calculate_res, append_args=(NUM_SAMPLES), way="stdout").execute()
+```
+
+##### Go
+
+```go
+func calculateOnePoint(session cf.App.Sesssion) int {
+    var x, y = rand.Float64(), rand.Float64()
+    if x * x + y * y < 1 {
+        return 1
+    }
+    return 0
+}
+
+func count(session cf.App.Session, points: []int) int:
+    res = 0
+    for _, i := range points {
+        res += i
+    }
+    return res
+
+func calculateRes(session: cf.App.Session, countRes: int, sampleNum: int) -> float64:
+    // 1st way
+    return countRes * 4 / session.FlowCount("calculate_one_point")
+    // 2nd way
+    return countRes * 4 / sampleNum
+
+func execute(app cf.App) {
+    session := app.CreateSession("session_cfg.yaml")
+    // 1st way
+    session.ImportFlow("cncf_workflow.yaml")
+    // 2nd way
+    flow := session.CreateFlow("pi")
+    // 1st way run
+    flow.Map(calculateOnePoint, NUM_SAMPLES).Execute()
+    flow.Reduce(count).Execute()
+    var outputInterface []interface{}
+    outputInterface = append(outputInterface, NUM_SAMPLES, "stdout")
+    flow.Output(calculateRes, outputInterface).Execute()
+}
+```
+
+
+#### Sort
+
+##### Python
+
+```python
+def data_read(session: cf.App.Session) -> list[int]:
+    pid = session.get_pid()
+    num = session.get_num()
+    f, range_list = session.get_source(pid, num)
+    data = []
+    contents = open(f).readlines()
+    for i in range(range_list[0], range_list[1]):
+        for str in contents[i].split(' '):
+            data.append(int(str))
+    return data
+
+def sort_unordered(session: cf.App.Session, raw: list[int]) -> list[int]:
+    raw.sort()
+    return raw
+
+def sort_ordered(session: cf.App.Session, raw: list[list[int]]) -> list[int]:
+    res = []
+    for l in raw:
+        res.append(min(l))
+
+# execution
+def execute(app: cf.App):
+    session = app.create_session("session_cfg.yaml")
+    file = "File Path"
+    session.create_source(file, type="file")
+    # 1st way
+    session.import_flow("cncf_workflow.yaml")
+    # 2nd way
+    flow = session.create_flow("wc")
+    # 1st way run
+    flow.input(data_read, count=20).execute()
+    flow.map(sort_local, batch_size=100, count=20).execute()
+    flow.reduce(wc_reduce, is_final=False).execute()
+    res = flow.reduce(wc_reduce, is_final=True).execute()
+    print(res)
+```
+
+#### ALS
+
+##### Python
+
+```python
+def data_read(session: cf.App.Session) -> list[int]:
+    pid = session.get_pid()
+    num = session.get_num()
+    src = session.get_source(pid, num)
+    data = []
+    for f in src:
+        data.append(f)
+    return data
+
+def update(session: cf.App.Session, i: int, mat: np.ndarray, ratings: np.ndarray) -> np.ndarray:
+    uu = mat.shape[0]
+    ff = mat.shape[1]
+    XtX = mat.T * mat
+    Xty = mat.T * ratings[i, :].T
+    for j in range(ff):
+        XtX[j, j] += LAMBDA * uu
+    return np.linalg.solve(XtX, Xty)
+
+def rmse(session: cf.App.Session, R: np.ndarray, ms: np.ndarray, us: np.ndarray) -> np.float64:
+    diff = R - ms * us.T
+    return np.sqrt(np.sum(np.power(diff, 2)) / (M * U))
+
+def execute(app: cf.App):
+    session := app.CreateSession("session_cfg.yaml")
+    M, U, F, ITERATIONS, partitions = 100, 500, 10, 5, 2
+
+    R = matrix(rand(M, F)) * matrix(rand(U, F).T)
+    ms: matrix = matrix(rand(M, F))
+    us: matrix = matrix(rand(U, F))
+
+    Rs = session.share(R)
+    mss = session.share(ms)
+    uss = session.share(us)
+    
+    flow = session.create_flow("pi")
+
+    for i in range(ITERATIONS):
+        ms_ = np.array()
+        session.create_source(M, type="data")
+        flow.input(data_read, count="auto").execute()
+        ms_ = flow.map(update, append_args=(usb.value, Rb.value), count="auto").execute()
+        # collect() returns a list, so array ends up being
+        # a 3-d array, we take the first 2 dims for the matrix
+        ms = matrix(np.array(ms_)[:, :, 0])
+        mss = session.share(ms)
+        flow.clean()
+
+        us_ = np.array()
+        session.create_source(U, type="data")
+        flow.input(data_read, count="auto").execute()
+        us_ = flow.map(update, append_args=(msb.value, Rb.value.T), count="auto").execute()
+        us = matrix(np.array(us_)[:, :, 0])
+        uss = session.share(us)
+        flow.clean()
+
+        error = rmse(R, ms, us)
+        print("Iteration %d:" % i)
+        print("\nRMSE: %5.4f\n" % error)
+```
+
+#### Logistic Regression
+
+```python
+def data_read(session: cf.App.Session) -> list[np.ndarray]:
+    strs = list(iterator)
+    matrix = np.zeros((len(strs), D + 1))
+    for i, s in enumerate(strs):
+        matrix[i] = np.fromstring(s.replace(',', ' '), dtype=np.float32, sep=' ')
+    return [matrix]
+
+ def gradient(matrix: np.ndarray, w: np.ndarray) -> np.ndarray:
+    Y = matrix[:, 0]    # point labels (first column of input file)
+    X = matrix[:, 1:]   # point coordinates
+    # For each point (x, y), compute gradient function, then sum these up
+    return ((1.0 / (1.0 + np.exp(-Y * X.dot(w))) - 1.0) * Y * X.T).sum(1)
+
+def add(x: list[np.ndarray]) -> np.ndarray:
+    raw = np.zeros(x[0].shape)
+    for i in x:
+        raw += i
+    return raw
+
+def execute(app: cf.App):
+    session := app.CreateSession("session_cfg.yaml")
+    files = os.listdir("File Path")
+    session.create_source(files, type="files")
+    D = 10  # Number of dimensions
+    flow = session.create_flow("lr")
+    iterations = 10
+    w = 2 * np.random.ranf(size=D) - 1
+    for i in range(iterations) :
+        flow.input(data_read, count="auto").execute()
+        flow.map(gradient, append_args=(w), count="auto").execute()
+        w -= flow.reduce(add).execute()
+    print("Final w: " + str(w))
 ```
 
 ## CLI
@@ -287,21 +545,39 @@ ascii font: slant
 / /___/ / /_/ / /_/ / /_/ / __/ / / /_/ / |/ |/ / 
 \____/_/\____/\__,_/\__,_/_/   /_/\____/|__/|__/  
                                                   
-===============================================================================
-An Inclusive Framework Supporting FLow, MicroServices and Distributed Computing
+=====================================================================================
+An Inclusive Framework Supporting MicroServices, Distributed and Serverless Computing
 
 Usage:
     cloudflow [command]
 
 Available Commands:
-    build    CloudFlow will build your go project
-    config
-    create
-    deploy
-    invoke
-    logs
-    info
-    remove
-    print
-    status
+    build           CloudFlow will build your go project
+                    [Usage]: build /path/to/project
+    config          Configure CloudFlow Platform
+                    [Usage]: config /path/to/cf_cfg.yaml
+    dashboard       Open Dashboard to Monitor Behavior in Browser
+                    [Usage]: dashboard open [-p|--port [port-num]]      # async open dashboard,
+                                                                        # access from ip:[portnum]
+                             dashboard close
+    deploy          Deploy app
+                    [Usage]: deploy [main.py|main.go] [options]
+    help            Show Commands Help
+    invoke          Invoke Session Operation
+                    [Usage]: invoke [session.py|session.go] [options]
+    log             Show CloudFlow/app/session Logs
+                    [Usage]: log                                        # cloudflow log
+                             log app [app-name]                         # app log
+                             log session [app-name:session-name]        # session log
+    delete          Delete app/session
+                    [Usage]: delete app [app-name]
+                             delete session [app-name:session-name]
+    status          Show status of CloudFlow/app/session, same as dashboard showing
+                    [Usage]: status                                     # cloudflow log
+                             status app [app-name]                      # app log
+                             status session [app-name:session-name]     # session log
+
+In non-cli mode, all commands below can be used with `cloudflow` or `cf` command, i.e.
+
+cf build /path/to/project
 ```
