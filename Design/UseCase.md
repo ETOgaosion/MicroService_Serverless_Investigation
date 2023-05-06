@@ -140,6 +140,43 @@ func utility() {
 
 ### Examples
 
+#### MicroServices
+
+类同[https://github.com/GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo)
+
+1. clone repo
+
+```sh
+git clone https://github.com/GoogleCloudPlatform/microservices-demo
+cd microservices-demo/
+```
+
+2. config cloudflow
+
+```sh
+cf config ./config/cf_cfg.yaml
+```
+
+3. build and deploy the app
+
+```sh
+cf build
+cf deploy MyApp
+```
+
+4. check dashboard, run below and access [localhost:24678](http://localhost:24678)
+
+```sh
+cf dashboard open
+```
+
+5. access your API Server url to use your service
+6. if you want to delete your service
+
+```sh
+cf delete app MyApp
+```
+
 #### MapReduce: WordCount
 
 ##### Python
@@ -637,15 +674,15 @@ Available Commands:
     init            CloudFlow init in working directory, add files that you can edit
                     [Usage]: init [/path/to/project]
     build           CloudFlow will build your go project
-                    [Usage]: build /path/to/project
+                    [Usage]: build [/path/to/project]
     config          Configure CloudFlow Platform
-                    [Usage]: config /path/to/cf_cfg.yaml
+                    [Usage]: config [/path/to/cf_cfg.yaml]
     dashboard       Open Dashboard to Monitor Behavior in Browser
                     [Usage]: dashboard open [-p|--port [port-num]]      # async open dashboard,
                                                                         # access from ip:[portnum]
                              dashboard close
     deploy          Deploy app
-                    [Usage]: deploy [main.py|main.go] [options]
+                    [Usage]: deploy [name] [options]
     invoke          Invoke Session Operation
                     [Usage]: invoke [session.py|session.go] [options]
     log             Show CloudFlow/app/session Logs
