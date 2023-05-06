@@ -8,6 +8,8 @@
 
 ##### Init `cf` and `app`
 
+使用`yaml`配置对`app`进行初始化，`app`持续运行
+
 ```python
 import cloudflow as cf
 
@@ -142,6 +144,8 @@ func utility() {
 
 ##### Python
 
+最标准的MapReduce问题，定义四种函数：输入、Map、Reduce、输出，利用`flow`提供的`input, map, reduce, output`函数进行处理，无需关心中间结果。
+
 ```python
 def data_read(session: cf.App.Session) -> list[str]:
     pid = session.get_pid()
@@ -212,6 +216,8 @@ def execute(app: cf.App):
 ```
 
 ##### Go
+
+go语言函数中无法指定可选参数，因此使用空接口代替`append_args`
 
 ```go
 func dataRead(session cf.App.Session) string {
@@ -315,6 +321,8 @@ func execute(app cf.App) {
 
 随机统计法
 
+在$$x,y\in (0, 1)$$的正方形中随机抛硬币，在四分之一单位圆中的概率为$$\frac{\pi}{4}$$，利用这一点求解$$\pi$$。利用分布式模拟硬币投掷，将结果进行汇总。
+
 ##### Python
 
 ```python
@@ -388,6 +396,8 @@ func execute(app cf.App) {
 
 #### Sort
 
+排序算法分为两部，将乱序数组分布式排序为局部有序数组，再对多个局部有序数组进行排序，时间复杂度$$O(\log{N})$$，其中N为数组总数
+
 ##### Python
 
 ```python
@@ -429,6 +439,8 @@ def execute(app: cf.App):
 ```
 
 #### ALS
+
+最小二乘，执行两个flow的MapReduce问题
 
 ##### Python
 
@@ -493,7 +505,77 @@ def execute(app: cf.App):
         print("\nRMSE: %5.4f\n" % error)
 ```
 
+#### K-Means
+
+K均值算法，需要一些数据的收集整理，使用`collect`操作将数据汇总到一个节点的内存中
+
+```python
+def data_read(session: cf.App.Session) -> list[str]:
+    pid = session.get_pid()
+    num = session.get_num()
+    f, range_list = session.get_source(pid, num)
+    data = []
+    contents = open(f).readlines()
+    for i in range(range_list[0], range_list[1]):
+        for str in contents[i].split(' '):
+            data.append(str)
+    return data
+
+def parse_vector(session: cf.App.Session, line: str) -> np.ndarray:
+    return np.array([float(x) for x in line.split(' ')])
+
+def take_samples(session: cf.App.Session, data: np.ndarray, in_size: int, in_replace: bool) -> np.ndarray:
+    return np.random.choice(data, size=in_size, replace=in_replace)
+
+def closest_point(session: cf.App.Session, p: np.ndarray, centers: List[np.ndarray]) -> tuple[int, tuple[np.ndarray, int]]:
+    bestIndex = 0
+    closest = float("+inf")
+    for i in range(len(centers)):
+        tempDist = np.sum((p - centers[i]) ** 2)
+        if tempDist < closest:
+            closest = tempDist
+            bestIndex = i
+    return (bestIndex, (p, 1))
+
+def reduce_func(session: cf.App.Session, pc_list: list[tuple[np.ndarray, int]]) -> tuple[int, tuple[np.ndarray, int]]:
+    res = (np.zeros(pc_list[0][0].shape()), 0)
+    for pc in pc_list:
+        res[0] += pc[0]
+        res[1] += pc[1]
+    return res
+
+def new_points_map(st: tuple[int, tuple[np.ndarray, int]]) -> tuple[int, tuple[np.ndarray, int]]:
+    return (st[0], st[1][0]/st[1][1])
+
+def execute(app: cf.App):
+    session = app.create_session("session_cfg.yaml")
+    file = "File Path"
+    session.create_source(file, type="file")
+    # 1st way
+    session.import_flow("cncf_workflow.yaml")
+    # 2nd way
+    flow = session.create_flow("wc")
+    # 1st way run
+    converge_dist = 1e-10
+    K = 10
+    temp_dist = 1
+    flow.input(data_read, count=20).execute()
+    data = flow.branch().map(parse_vector, count="auto").execute()
+    k_points = flow.branch().add(take_samples, append_args=(K, False)).collect().execute()
+    while temp_dist > converge_dist:
+        flow.merge().add(closest_point).execute()
+        flow.reduce(reduce_func).execute()
+        flow.map(new_points_map, count="auto").execute()
+        new_points = flow.collect().execute()
+        temp_dist = sum(np.sum((k_points[iK] - p) ** 2) for (iK, p) in new_points)
+        for (iK, p) in new_points:
+            k_points[iK] = p
+    print("Final centers: " + str(k_points))
+```
+
 #### Logistic Regression
+
+迭代进行的MapReduce操作
 
 ```python
 def data_read(session: cf.App.Session) -> list[np.ndarray]:
@@ -503,13 +585,13 @@ def data_read(session: cf.App.Session) -> list[np.ndarray]:
         matrix[i] = np.fromstring(s.replace(',', ' '), dtype=np.float32, sep=' ')
     return [matrix]
 
- def gradient(matrix: np.ndarray, w: np.ndarray) -> np.ndarray:
+ def gradient(session: cf.App.Session, matrix: np.ndarray, w: np.ndarray) -> np.ndarray:
     Y = matrix[:, 0]    # point labels (first column of input file)
     X = matrix[:, 1:]   # point coordinates
     # For each point (x, y), compute gradient function, then sum these up
     return ((1.0 / (1.0 + np.exp(-Y * X.dot(w))) - 1.0) * Y * X.T).sum(1)
 
-def add(x: list[np.ndarray]) -> np.ndarray:
+def add(session: cf.App.Session, x: list[np.ndarray]) -> np.ndarray:
     raw = np.zeros(x[0].shape)
     for i in x:
         raw += i
@@ -552,6 +634,8 @@ Usage:
     cloudflow [command]
 
 Available Commands:
+    init            CloudFlow init in working directory, add files that you can edit
+                    [Usage]: init [/path/to/project]
     build           CloudFlow will build your go project
                     [Usage]: build /path/to/project
     config          Configure CloudFlow Platform
@@ -562,7 +646,6 @@ Available Commands:
                              dashboard close
     deploy          Deploy app
                     [Usage]: deploy [main.py|main.go] [options]
-    help            Show Commands Help
     invoke          Invoke Session Operation
                     [Usage]: invoke [session.py|session.go] [options]
     log             Show CloudFlow/app/session Logs
@@ -576,6 +659,7 @@ Available Commands:
                     [Usage]: status                                     # cloudflow log
                              status app [app-name]                      # app log
                              status session [app-name:session-name]     # session log
+    help            Show Commands Help
 
 In non-cli mode, all commands below can be used with `cloudflow` or `cf` command, i.e.
 
