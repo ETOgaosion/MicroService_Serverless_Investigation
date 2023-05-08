@@ -675,8 +675,10 @@ Available Commands:
                     [Usage]: init [/path/to/project]
     build           CloudFlow will build your go project
                     [Usage]: build [/path/to/project]
-    config          Configure CloudFlow Platform
+    config          Configure CloudFlow Platform/App/Session
                     [Usage]: config [/path/to/cf_cfg.yaml]
+                    [Usage]: config app [/path/to/cf_cfg.yaml]
+                    [Usage]: config session [/path/to/cf_cfg.yaml]
     dashboard       Open Dashboard to Monitor Behavior in Browser
                     [Usage]: dashboard open [-p|--port [port-num]]      # async open dashboard,
                                                                         # access from ip:[portnum]
